@@ -1,0 +1,49 @@
+#!/bin/bash
+
+# Credit to https://github.com/acodega
+
+# Get serial number using system_profiler
+serial_number=$(system_profiler SPHardwareDataType | awk '/Serial/ {print $4}')
+
+# Displays icon based on type of device
+hwType=$(/usr/sbin/system_profiler SPHardwareDataType | grep "Model Identifier" | grep "Book")  
+if [ "$hwType" != "" ]; then
+  icon="SF=laptopcomputer"
+else
+  icon="SF=desktopcomputer"
+fi 
+
+dialogApp="/usr/local/bin/dialog"
+
+title="Set Computer Name"
+message="Time to set a computer name! \n\n Please use DT/LT (to denote a Desktop or Laptop) + the 5 digit asset tag number on your Mac.  EXAMPLE: LT1234 \n\n Serial number:$serial_number"
+
+dialogCMD="$dialogApp -p --title \"$title\" \
+--icon \"$icon\" \
+--message \"$message\" \
+--messagefont "name=arial,size=15" \
+--small \
+--button1text "Set" \
+--button2 \
+--ontop \
+--moveable \
+--textfield \"Computer Name\""
+
+computerName=$(eval "$dialogCMD" | awk -F " : " '{print $NF}')
+
+if [[ $computerName == "" ]]; then
+  echo "Aborting"
+  exit 1
+fi
+
+scutil --set HostName "$computerName"
+scutil --set LocalHostName "$computerName"
+scutil --set ComputerName "$computerName"
+
+# Run Jamf binary command to update inventory record with new computer name
+/usr/local/bin/jamf recon -setComputerName "$computerName"
+
+# Echo new computer name for logging
+echo "Computer Name is now $computerName"
+
+exit 0
